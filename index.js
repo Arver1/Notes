@@ -2,8 +2,6 @@ const fs = require('fs');
 const flag = process.argv[2];
 const title = process.argv[3];
 const content = process.argv[4];
-let index = 0;
-const notes = [];
 switch(flag) {
   case 'create':
     createNotes(title, content, (error) => {
@@ -15,7 +13,7 @@ switch(flag) {
     break;
   case 'list':
     watchListNotes((error, notes) => {
-      if(error) return console.log(`Увы что-то пошло не так при просмотре файла : ${error.messsage}`);
+      if(error) return console.log(`Увы что-то пошло не так при просмотре файла :\n ${error.messsage}`);
       notes.forEach((value,i) => console.log(`${++i}. ${value.title}`));
     });
     break;
@@ -38,10 +36,10 @@ switch(flag) {
     console.log('Неизвестная мне команда,печаль =(')
 }
 function viewNote(title, done) {
-  fs.readFile('notes.json', 'utf-8', (error, data) => {
+  load ((error, notes) => {
     if(error) return done(error);
     let note = null;
-    JSON.parse(data).forEach((value) => {
+    notes.forEach((value) => {
       if(value.title === title.toString()) {
         return note = value;
       }
@@ -53,14 +51,10 @@ function viewNote(title, done) {
   });
 }
 function  watchListNotes(done){
-  fs.readFile('notes.json', 'utf-8', (error, data) => {
-    if(error) return done(error);
-    const notes = JSON.parse(data);
-    done(null, notes);
-  });
+  load(done);
 }
 function createNotes(title, content, done){
-  fs.readFile('notes.json', 'utf-8', (error, data) => {
+  load((error, notes) => {
     if(error) return done(error);
     if(!title) {
       return console.log("Заметка не задана");
@@ -68,27 +62,48 @@ function createNotes(title, content, done){
     if(!content) {
       return console.log("Описание заметки не задано");
     }
-    const notes = JSON.parse(data);
     notes.push({title: title, content: content});
-    const notesJSON = JSON.stringify(notes);
-    fs.writeFile('notes.json',notesJSON, 'utf-8', (error) => {
-      if(error) console.log('Увы что-то пошло не так при записи файла');
-    })
-    done();
+    save(notes, done);
   });
 }
 function removeNote(title, done) {
-  fs.readFile('notes.json', 'utf-8', (error, data) => {
+ load((error, notes) => {
     if(error) return done(error);
-    const notes = JSON.parse(data);
     const filterNotes = notes.filter(value => value.title !== title);
     if(filterNotes.length === notes.length) {
       return console.log('Такой заметки не найдено')
     }
-    const notesJSON = JSON.stringify(filterNotes);
-    fs.writeFile('notes.json',notesJSON, 'utf-8', (error) => {
-      if(error) console.log('Увы что-то пошло не так при записи файла');
-    })
-    done();
+    save(filterNotes, done);
   });
+}
+function load(done) {
+  fs.readFile('notes.json', 'utf-8', (error, data) => {
+    if(error) {
+      if(error.code === 'ENOENT') {
+        return done(null, []);
+      } else {
+        return done(error);
+      }
+    }
+    try {
+      if(data.length === 0) {
+        return done(null, []);
+      }
+      const notes = JSON.parse(data);
+      done(null, notes);
+    } catch(e) {
+      done(e);
+    }
+  });
+}
+function save(notes, done) {
+  try {
+    const notesJSON = JSON.stringify(notes);
+    fs.writeFile('notes.json',notesJSON, 'utf-8', (error) => {
+      if(error) return done(error);
+      done();
+    })
+  } catch(e){
+    done(e);
+  }
 }
